@@ -23,7 +23,7 @@ jobs:
       with:
         cmake-version: '3.20'
 
-    - name: Setup Ninja (Ubuntu/macOS)
+    - name: Setup Ninja (Unix)
       if: runner.os != 'Windows'
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
@@ -33,18 +33,18 @@ jobs:
           brew install ninja
         fi
 
-    - name: Setup Ninja (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        choco install ninja
-
     - name: Setup MSVC (Windows)
       if: runner.os == 'Windows'
-      uses: microsoft/setup-msbuild@v1.3
+      uses: microsoft/setup-msbuild@v2
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G Ninja
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G "Visual Studio 17 2022" -A x64
+        else
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G Ninja
+        fi
+      shell: bash
 
     - name: Build
       run: |
