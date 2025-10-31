@@ -18,6 +18,8 @@ jobs:
       run: |
         ls -la
         pwd
+        echo "Looking for CMakeLists.txt:"
+        find . -name "CMakeLists.txt" -o -name "CmakeLists.txt" -o -name "cmakeLists.txt" -o -name "*.txt" | head -10
 
     - name: Install dependencies
       run: |
@@ -48,6 +50,9 @@ jobs:
       run: |
         dir
         echo "Current directory: %CD%"
+        echo "Looking for CMakeLists.txt:"
+        where CMakeLists.txt 2>nul || echo "CMakeLists.txt not found"
+        dir *.txt
       shell: cmd
 
     - name: Setup CMake
