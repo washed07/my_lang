@@ -110,7 +110,8 @@ std::unique_ptr<Token> Lexer::lexAlpha() {
 
 std::unique_ptr<Token> Lexer::lexNumeric() {
   if (std::isdigit(this->peek())) {
-    this->take(std::isdigit);
+    this->take(
+        [](char c) { return std::isdigit(static_cast<unsigned char>(c)); });
 
     if (this->peek() == '.') {
       // Check if this is a range operator '..'/'...' instead of a float
@@ -119,7 +120,8 @@ std::unique_ptr<Token> Lexer::lexNumeric() {
         return this->makeToken(TokenKind::Integer);
       } else {
         this->advance();
-        this->take(std::isdigit);
+        this->take(
+            [](char c) { return std::isdigit(static_cast<unsigned char>(c)); });
         return this->makeToken(TokenKind::Float);
       }
     } else {
@@ -186,10 +188,30 @@ std::unique_ptr<Token> Lexer::lexString() {
 
 std::unique_ptr<Token> Lexer::lexOperator() {
   if (basic::isOp(this->look())) {
-    this->advance(); // Operator
-    if (basic::isOp(this->value() + this->peek())) {
-      this->advance();
+    this->advance(); // Consume first operator character
+
+    // Check for two-character operator
+    if (this->peek() != '\0') {
+      std::string current_op = this->value();
+      char next_char = this->peek();
+      std::string two_char_op = current_op + next_char;
+
+      if (basic::isOp(two_char_op)) {
+        this->advance(); // Consume second character
+
+        // Check for three-character operator
+        if (this->peek() != '\0') {
+          current_op = this->value();
+          next_char = this->peek();
+          std::string three_char_op = current_op + next_char;
+
+          if (basic::isOp(three_char_op)) {
+            this->advance(); // Consume third character
+          }
+        }
+      }
     }
+
     return this->makeToken(TokenKind::Operator);
   } else {
     return nullptr;
