@@ -33,17 +33,22 @@ jobs:
           brew install ninja
         fi
 
+    - name: Setup Ninja (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        choco install ninja
+
     - name: Setup MSVC (Windows)
       if: runner.os == 'Windows'
       uses: microsoft/setup-msbuild@v2
 
+    - name: Setup MSVC Environment (Windows)
+      if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@v1
+
     - name: Configure CMake
       run: |
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G "Visual Studio 16 2019" -A x64
-        else
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G Ninja
-        fi
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G Ninja
       shell: bash
 
     - name: Build

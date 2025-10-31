@@ -55,12 +55,19 @@ jobs:
       with:
         cmake-version: '3.25'
 
-    - name: Setup Visual Studio Environment
+    - name: Setup Ninja
+      run: |
+        choco install ninja
+
+    - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 16 2019" -A x64
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
 
     - name: Build
       run: |
