@@ -188,30 +188,10 @@ std::unique_ptr<Token> Lexer::lexString() {
 
 std::unique_ptr<Token> Lexer::lexOperator() {
   if (basic::isOp(this->look())) {
-    this->advance(); // Consume first operator character
-
-    // Check for two-character operator
-    if (this->peek() != '\0') {
-      std::string current_op = this->value();
-      char next_char = this->peek();
-      std::string two_char_op = current_op + next_char;
-
-      if (basic::isOp(two_char_op)) {
-        this->advance(); // Consume second character
-
-        // Check for three-character operator
-        if (this->peek() != '\0') {
-          current_op = this->value();
-          next_char = this->peek();
-          std::string three_char_op = current_op + next_char;
-
-          if (basic::isOp(three_char_op)) {
-            this->advance(); // Consume third character
-          }
-        }
-      }
+    this->advance();
+    if (basic::isOp(this->look())) {
+      this->advance();
     }
-
     return this->makeToken(TokenKind::Operator);
   } else {
     return nullptr;
