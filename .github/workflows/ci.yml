@@ -21,7 +21,7 @@ jobs:
     - name: Setup CMake
       uses: jwlawson/actions-setup-cmake@v1.14
       with:
-        cmake-version: '3.20'
+        cmake-version: '3.25'
 
     - name: Setup Ninja (Unix)
       if: runner.os != 'Windows'
@@ -40,7 +40,7 @@ jobs:
     - name: Configure CMake
       run: |
         if [ "$RUNNER_OS" == "Windows" ]; then
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G "Visual Studio 17 2022" -A x64
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G "Visual Studio 16 2019" -A x64
         else
           cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G Ninja
         fi
