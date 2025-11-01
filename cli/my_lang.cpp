@@ -25,9 +25,9 @@ int main(int argc, char **argv) {
   }
 
   std::string file_path = argv[1];
-  auto program = compiler.compileFile(file_path, config);
+  auto result = compiler.compileFile(file_path, config);
 
-  if (program) {
+  if (result == 0) {
     std::cout << "Compilation successful!" << std::endl;
   } else {
     std::cerr << "Compilation failed." << std::endl;
@@ -38,5 +38,5 @@ int main(int argc, char **argv) {
     std::cin.get();
   }
 
-  return 0;
+  return result;
 }

@@ -61,4 +61,16 @@ inline std::string accstr(const Accessor acc) {
   }
 }
 
+inline bool canAccess(const Accessor member_acc, const Accessor accessor_acc) {
+  if (member_acc == Accessor::Public) {
+    return true;
+  } else if (member_acc == Accessor::Private) {
+    return accessor_acc == Accessor::Private;
+  } else if (member_acc == Accessor::Protected) {
+    return accessor_acc == Accessor::Protected ||
+           accessor_acc == Accessor::Private;
+  }
+  return false;
+}
+
 } // namespace ml::basic

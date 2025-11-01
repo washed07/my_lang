@@ -43,18 +43,16 @@ public:
    * @param source The source code to compile.
    * @return A unique pointer to the AST root node.
    */
-  std::unique_ptr<ast::Program>
-  compileSource(const std::string &source,
-                const Configuration &config = Configuration());
+  uint64_t compileSource(const std::string &source,
+                         const Configuration &config = Configuration());
 
   /**
    * @brief Compiles the source code from the given file.
    * @param file_path The path to the source file.
    * @return A unique pointer to the AST root node.
    */
-  std::unique_ptr<ast::Program>
-  compileFile(const std::string &file_path,
-              const Configuration &config = Configuration());
+  uint64_t compileFile(const std::string &file_path,
+                       const Configuration &config = Configuration());
 };
 
 } // namespace ml::compiler

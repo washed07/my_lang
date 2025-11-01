@@ -92,6 +92,8 @@ struct UnaryExpression : public Expression,
   ENABLE_VISITORS(UnaryExpression)
 };
 
+enum class LiteralType { Integer, Float, String, Character, Boolean, Null };
+
 /**
  * @struct LiteralExpression expr.h
  * @brief Represents a literal expression in the AST.
@@ -105,11 +107,11 @@ struct LiteralExpression : public Expression,
    * @brief The literal value of the expression.
    */
   std::string value;
+  LiteralType type;
 
   LiteralExpression(const basic::Locus start, const basic::Locus end,
-                    std::string value)
-      : Expression(start, end), value(value) {}
-
+                    std::string value, LiteralType type)
+      : Expression(start, end), value(value), type(type) {}
   ENABLE_VISITORS(LiteralExpression)
 };
 

@@ -108,7 +108,7 @@ TEST_F(ParserTest, ArrayVariableDeclaration) {
 }
 
 TEST_F(ParserTest, NullableVariableDeclaration) {
-  auto program = parseSource("let opt?: int = null;");
+  auto program = parseSource("let opt: int? = null;");
   EXPECT_NE(program, nullptr);
   ASSERT_EQ(program->statements.size(), 1);
 

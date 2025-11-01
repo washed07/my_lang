@@ -157,7 +157,8 @@ private:
    * semi-colon requirement.
    * @return A unique pointer to the parsed Declaration AST node.
    */
-  std::unique_ptr<ml::ast::VariableDeclaration> parseVariable(bool verbose);
+  std::unique_ptr<ml::ast::VariableDeclaration> parseVariable(bool verbose,
+                                                              bool semicolon);
 
   /**
    * @brief Parses a function declaration.

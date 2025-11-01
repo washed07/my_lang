@@ -20,6 +20,7 @@ target_link_libraries(
     ML::Lexer
     ML::Parser
     ML::Ast
+    ML::Sema
 )
 
 set_target_properties(

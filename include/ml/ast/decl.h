@@ -93,7 +93,7 @@ struct FunctionDeclaration : public Declaration,
    * @var parameters
    * @brief The list of parameter declarations for the function.
    */
-  std::vector<std::unique_ptr<Declaration>> parameters;
+  std::vector<std::unique_ptr<VariableDeclaration>> parameters;
 
   /**
    * @var body
@@ -101,12 +101,13 @@ struct FunctionDeclaration : public Declaration,
    */
   std::unique_ptr<BlockStatement> body;
 
-  FunctionDeclaration(const basic::Locus start, const basic::Locus end,
-                      std::unique_ptr<IdentifierExpression> identifier,
-                      std::unique_ptr<Expression> type,
-                      std::unique_ptr<ModifierStatement> modifier,
-                      std::vector<std::unique_ptr<Declaration>> parameters,
-                      std::unique_ptr<BlockStatement> body)
+  FunctionDeclaration(
+      const basic::Locus start, const basic::Locus end,
+      std::unique_ptr<IdentifierExpression> identifier,
+      std::unique_ptr<Expression> type,
+      std::unique_ptr<ModifierStatement> modifier,
+      std::vector<std::unique_ptr<VariableDeclaration>> parameters,
+      std::unique_ptr<BlockStatement> body)
       : Declaration(start, end, std::move(identifier), std::move(type),
                     std::move(modifier)),
         parameters(std::move(parameters)), body(std::move(body)) {}

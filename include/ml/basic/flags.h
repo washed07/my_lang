@@ -9,8 +9,6 @@
 
 #include <type_traits>
 
-namespace ml::basic {
-
 /**
  * @struct enable_bitmask_operators flags.h
  * @brief Trait to enable bitmask operators for enum classes.
@@ -113,5 +111,3 @@ template <typename E> E addFlag(E flags, E flag) { return flags |= flag; }
  * @return The updated flags with the removed flag.
  */
 template <typename E> E removeFlag(E flags, E flag) { return flags &= ~flag; }
-
-} // namespace ml::basic

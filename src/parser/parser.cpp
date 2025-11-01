@@ -142,8 +142,8 @@ std::unique_ptr<ml::ast::Statement> Parser::parseStatement() {
   } else if (this->checkValue("{")) {
     return this->parseBlock();
   } else if (this->checkValue("let")) {
-    return this->parseVariable(true);
-  } else if (this->checkValue("fn")) {
+    return this->parseVariable(true, true);
+  } else if (this->checkValue("fn") || basic::isacc(this->peek()->value)) {
     return this->parseFunction();
   } else if (this->checkValue("rec")) {
     return this->parseRecord();
@@ -233,7 +233,7 @@ Parser::parseExpressionStatement() {
 }
 
 std::unique_ptr<ml::ast::VariableDeclaration>
-Parser::parseVariable(bool verbose) {
+Parser::parseVariable(bool verbose, bool semicolon) {
   if (verbose) {
     this->expectValue("let", "");
   }
@@ -246,10 +246,6 @@ Parser::parseVariable(bool verbose) {
       std::make_unique<ml::ast::IdentifierExpression>(
           identifierToken->start, identifierToken->end, identifierToken->value);
 
-  if (this->matchValue("?")) {
-    modifier->modifier |= ml::basic::Modifier::Nullable;
-  }
-
   if (this->matchValue(":")) {
     auto typeIdentifierToken = this->expectToken(
         ml::lexer::TokenKind::Identifier, "after ':' in variable declaration");
@@ -258,7 +254,8 @@ Parser::parseVariable(bool verbose) {
       std::unique_ptr<ml::ast::Expression> size;
       if (this->checkValue("]")) {
         size = std::make_unique<ml::ast::LiteralExpression>(
-            typeIdentifierToken->start, typeIdentifierToken->end, "-1");
+            typeIdentifierToken->start, typeIdentifierToken->end, "-1",
+            ast::LiteralType::Integer);
       } else {
         size = this->parseExpression();
       }
@@ -271,13 +268,15 @@ Parser::parseVariable(bool verbose) {
           typeIdentifierToken->start, typeIdentifierToken->end,
           typeIdentifierToken->value);
     }
-
+    if (this->matchValue("?")) {
+      modifier->modifier |= ml::basic::Modifier::Nullable;
+    }
     std::unique_ptr<ml::ast::Expression> initializer = nullptr;
     if (this->matchValue("=")) {
       auto initExpr = this->parseExpression();
       initializer = std::move(initExpr);
     }
-    if (verbose) {
+    if (semicolon) {
       this->expectValue(";", "after variable declaration");
     }
     return std::make_unique<ml::ast::VariableDeclaration>(
@@ -285,14 +284,20 @@ Parser::parseVariable(bool verbose) {
         std::move(identifier), std::move(type), std::move(modifier),
         std::move(initializer));
   } else if (this->checkToken(ml::lexer::TokenKind::Identifier)) {
-    auto typeIdentifierToken = this->expectToken(
-        ml::lexer::TokenKind::Identifier, "after ':' in variable declaration");
+    basic::Error err(basic::ErrorLevel::Warning,
+                     "Type annotation missing ':' in variable declaration",
+                     "Assuming type annotation is present before type name",
+                     this->peek()->start, this->peek()->end, "<input>",
+                     this->lexer_.source(), 0);
+    err.log();
+    auto typeIdentifierToken = this->advance();
     std::unique_ptr<ml::ast::IdentifierExpression> type;
     if (this->matchValue("[")) {
       std::unique_ptr<ml::ast::Expression> size;
       if (this->checkValue("]")) {
         size = std::make_unique<ml::ast::LiteralExpression>(
-            typeIdentifierToken->start, typeIdentifierToken->end, "-1");
+            typeIdentifierToken->start, typeIdentifierToken->end, "-1",
+            ast::LiteralType::Integer);
       } else {
         size = this->parseExpression();
       }
@@ -300,30 +305,45 @@ Parser::parseVariable(bool verbose) {
       type = std::make_unique<ml::ast::ArrayIdentifierExpression>(
           typeIdentifierToken->start, typeIdentifierToken->end,
           typeIdentifierToken->value, std::move(size));
+      std::unique_ptr<ml::ast::Expression> initializer = nullptr;
+      if (this->matchValue("=")) {
+        auto initExpr = this->parseExpression();
+        initializer = std::move(initExpr);
+      }
+      if (semicolon) {
+        this->expectValue(";", "after variable declaration");
+      }
+      return std::make_unique<ml::ast::VariableDeclaration>(
+          identifierToken->start, initializer ? initializer->end : type->end,
+          std::move(identifier), std::move(type), std::move(modifier),
+          std::move(initializer));
     } else {
       type = std::make_unique<ml::ast::IdentifierExpression>(
           typeIdentifierToken->start, typeIdentifierToken->end,
           typeIdentifierToken->value);
+      std::unique_ptr<ml::ast::Expression> initializer = nullptr;
+      if (this->matchValue("=")) {
+        auto initExpr = this->parseExpression();
+        initializer = std::move(initExpr);
+      }
+      if (semicolon) {
+        this->expectValue(";", "after variable declaration");
+      }
+      return std::make_unique<ml::ast::VariableDeclaration>(
+          identifierToken->start, initializer ? initializer->end : type->end,
+          std::move(identifier), std::move(type), std::move(modifier),
+          std::move(initializer));
     }
-    std::unique_ptr<ml::ast::Expression> initializer = nullptr;
-    if (this->matchValue("=")) {
-      auto initExpr = this->parseExpression();
-      initializer = std::move(initExpr);
-    }
-    if (verbose) {
-      this->expectValue(";", "after variable declaration");
-    }
-    return std::make_unique<ml::ast::VariableDeclaration>(
-        identifierToken->start, initializer ? initializer->end : type->end,
-        std::move(identifier), std::move(type), std::move(modifier),
-        std::move(initializer));
   } else {
+    if (this->matchValue("?")) {
+      modifier->modifier |= ml::basic::Modifier::Nullable;
+    }
     std::unique_ptr<ml::ast::Expression> initializer = nullptr;
     if (this->matchValue("=")) {
       auto initExpr = this->parseExpression();
       initializer = std::move(initExpr);
     }
-    if (verbose) {
+    if (semicolon) {
       this->expectValue(";", "after variable declaration");
     }
     return std::make_unique<ml::ast::VariableDeclaration>(
@@ -337,11 +357,19 @@ Parser::parseVariable(bool verbose) {
 }
 
 std::unique_ptr<ml::ast::FunctionDeclaration> Parser::parseFunction() {
+  auto modifier = this->parseModifier();
   this->expectValue("fn", "to start function declaration");
 
-  auto modifier = this->parseModifier();
+  if (basic::isacc(this->peek()->value)) {
+    basic::Error err(
+        basic::ErrorLevel::Error, "Invalid accessor position for function",
+        "Function accessors are positioned before the 'fn' keyword",
+        this->peek()->start, this->peek()->end, "<input>",
+        this->lexer_.source(), 0);
+    err.log();
+  }
   std::unique_ptr<ml::ast::IdentifierExpression> identifier;
-  if (basic::hasFlag(modifier->modifier, ml::basic::Modifier::Init)) {
+  if (hasFlag(modifier->modifier, ml::basic::Modifier::Init)) {
     identifier = std::make_unique<ml::ast::IdentifierExpression>(
         ml::basic::Locus(0, 0), ml::basic::Locus(0, 0), "init");
   } else {
@@ -356,10 +384,10 @@ std::unique_ptr<ml::ast::FunctionDeclaration> Parser::parseFunction() {
   }
 
   this->expectValue("(", "after function name in function declaration");
-  std::vector<std::unique_ptr<ml::ast::Declaration>> parameters;
+  std::vector<std::unique_ptr<ml::ast::VariableDeclaration>> parameters;
   if (!this->matchValue(")")) {
     do {
-      auto param = this->parseVariable(false);
+      auto param = this->parseVariable(false, false);
       if (param) {
         parameters.push_back(std::move(param));
       } else {
@@ -372,7 +400,6 @@ std::unique_ptr<ml::ast::FunctionDeclaration> Parser::parseFunction() {
   std::unique_ptr<ml::ast::IdentifierExpression> typeIdentifier =
       std::make_unique<ml::ast::IdentifierExpression>(
           ml::basic::Locus(0, 0), ml::basic::Locus(0, 0), "void");
-  std::unique_ptr<ml::ast::IdentifierExpression> type;
   if (this->matchValue(":")) {
     auto typeIdentifierToken = this->expectToken(
         ml::lexer::TokenKind::Identifier, "after ':' in function declaration");
@@ -381,37 +408,46 @@ std::unique_ptr<ml::ast::FunctionDeclaration> Parser::parseFunction() {
       std::unique_ptr<ml::ast::Expression> size;
       if (this->checkValue("]")) {
         size = std::make_unique<ml::ast::LiteralExpression>(
-            typeIdentifierToken->start, typeIdentifierToken->end, "-1");
+            typeIdentifierToken->start, typeIdentifierToken->end, "-1",
+            ast::LiteralType::Integer);
       } else {
         size = this->parseExpression();
       }
       this->expectValue("]", "after array size in variable declaration");
-      type = std::make_unique<ml::ast::ArrayIdentifierExpression>(
+      typeIdentifier = std::make_unique<ml::ast::ArrayIdentifierExpression>(
           typeIdentifierToken->start, typeIdentifierToken->end,
           typeIdentifierToken->value, std::move(size));
     } else {
-      type = std::make_unique<ml::ast::IdentifierExpression>(
+      typeIdentifier = std::make_unique<ml::ast::IdentifierExpression>(
           typeIdentifierToken->start, typeIdentifierToken->end,
           typeIdentifierToken->value);
     }
-  } else if (this->matchToken(ml::lexer::TokenKind::Identifier)) {
-    auto typeIdentifierToken = this->last_token_;
+  } else if (this->checkToken(ml::lexer::TokenKind::Identifier)) {
+    basic::Error err(basic::ErrorLevel::Warning,
+                     "Type annotation missing ':' in function declaration",
+                     "Assuming type annotation is present before type name",
+                     this->last_token_.end, this->peek()->end, "<input>",
+                     this->lexer_.source(), 0);
+    err.log();
+    auto typeIdentifierToken = this->expectToken(
+        ml::lexer::TokenKind::Identifier, "after ':' in function declaration");
     if (this->matchValue("[")) {
       std::unique_ptr<ml::ast::Expression> size;
       if (this->checkValue("]")) {
         size = std::make_unique<ml::ast::LiteralExpression>(
-            typeIdentifierToken.start, typeIdentifierToken.end, "-1");
+            typeIdentifierToken->start, typeIdentifierToken->end, "-1",
+            ast::LiteralType::Integer);
       } else {
         size = this->parseExpression();
       }
       this->expectValue("]", "after array size in variable declaration");
-      type = std::make_unique<ml::ast::ArrayIdentifierExpression>(
-          typeIdentifierToken.start, typeIdentifierToken.end,
-          typeIdentifierToken.value, std::move(size));
+      typeIdentifier = std::make_unique<ml::ast::ArrayIdentifierExpression>(
+          typeIdentifierToken->start, typeIdentifierToken->end,
+          typeIdentifierToken->value, std::move(size));
     } else {
-      type = std::make_unique<ml::ast::IdentifierExpression>(
-          typeIdentifierToken.start, typeIdentifierToken.end,
-          typeIdentifierToken.value);
+      typeIdentifier = std::make_unique<ml::ast::IdentifierExpression>(
+          typeIdentifierToken->start, typeIdentifierToken->end,
+          typeIdentifierToken->value);
     }
   }
 
@@ -435,7 +471,7 @@ std::unique_ptr<ml::ast::RecordDeclaration> Parser::parseRecord() {
   this->expectValue("{", "after record name in record declaration");
   std::vector<std::unique_ptr<ml::ast::VariableDeclaration>> fields;
   while (!this->isEof() && !this->checkValue("}")) {
-    auto field = this->parseVariable(true);
+    auto field = this->parseVariable(false, true);
     if (field) {
       fields.push_back(std::move(field));
     } else {
@@ -462,23 +498,42 @@ std::unique_ptr<ml::ast::ClassDeclaration> Parser::parseClass() {
   std::vector<std::unique_ptr<ml::ast::VariableDeclaration>> fields;
   std::vector<std::unique_ptr<ml::ast::FunctionDeclaration>> methods;
   this->expectValue("{", "after class name in class declaration");
+  uint64_t i = 0;
   while (!this->isEof() && !this->checkValue("}")) {
-    if (this->checkValue("let")) {
-      auto field = this->parseVariable(true);
-      if (field) {
-        fields.push_back(std::move(field));
-      } else {
-        break;
+    const auto *token_i = this->look(i);
+    if ((token_i && basic::isacc(token_i->value)) ||
+        (token_i && basic::ismod(token_i->value))) {
+      uint64_t j = i;
+      const auto *token_j = this->look(j);
+      while (token_j &&
+             (basic::isacc(token_j->value) || basic::ismod(token_j->value))) {
+        j++;
+        token_j = this->look(j);
       }
-    } else if (this->checkValue("fn")) {
+      if (token_j && token_j->value == "fn") {
+        this->index_ += i;
+        auto method = this->parseFunction();
+        if (method) {
+          methods.push_back(std::move(method));
+        }
+        i = 0;
+      } else {
+        this->index_ += i;
+        auto field = this->parseVariable(false, true);
+        if (field) {
+          fields.push_back(std::move(field));
+        }
+        i = 0;
+      }
+    } else if (token_i && token_i->value == "fn") {
+      this->index_ += i;
       auto method = this->parseFunction();
       if (method) {
         methods.push_back(std::move(method));
-      } else {
-        break;
       }
+      i = 0;
     } else {
-      break;
+      i++;
     }
   }
   this->expectValue("}", "after class fields and methods in class declaration");
@@ -568,7 +623,7 @@ std::unique_ptr<ml::ast::ForConditional> Parser::parseFor() {
   this->expectValue("(", "after 'for' in for conditional");
 
   if (this->checkValue("let")) {
-    auto initializer = this->parseVariable(true);
+    auto initializer = this->parseVariable(false, true);
 
     std::unique_ptr<ml::ast::Expression> condition = this->parseExpression();
     this->expectValue(";", "after for loop condition");
@@ -585,11 +640,8 @@ std::unique_ptr<ml::ast::ForConditional> Parser::parseFor() {
         std::move(condition), std::move(increment), std::move(body));
   } else {
     if (this->checkToken(ml::lexer::TokenKind::Identifier) &&
-        (this->look(1)->value == "in" ||
-         (this->look(1)->value == ":" &&
-          this->look(2)->kind == ml::lexer::TokenKind::Identifier &&
-          this->look(3)->value == "in"))) {
-      auto initializer = this->parseVariable(false);
+        (this->look(1)->value == ":")) {
+      auto initializer = this->parseVariable(false, false);
       this->expectValue("in", "after for-each variable declaration");
       auto iterable = this->parseExpression();
       this->expectValue(")", "after for-each iterable expression");
@@ -662,7 +714,7 @@ std::unique_ptr<ml::ast::Expression> Parser::parseComparison() {
   auto expr = this->parseTerm();
   while (this->matchValue("<") || this->matchValue(">") ||
          this->matchValue("<=") || this->matchValue(">=") ||
-         this->matchValue("..") || this->matchValue(".=")) {
+         this->matchValue("..") || this->matchValue("...")) {
     auto opToken = this->tokens_[this->index_ - 1].get();
     auto right = this->parseTerm();
     expr = std::make_unique<ml::ast::BinaryExpression>(
@@ -746,34 +798,38 @@ std::unique_ptr<ml::ast::Expression> Parser::parsePostfix() {
 std::unique_ptr<ml::ast::Expression> Parser::parsePrimary() {
   if (this->matchValue("true")) {
     auto *token = this->tokens_[this->index_ - 1].get();
-    return std::make_unique<ml::ast::LiteralExpression>(token->start,
-                                                        token->end, "true");
+    return std::make_unique<ml::ast::LiteralExpression>(
+        token->start, token->end, "true", ast::LiteralType::Boolean);
   }
   if (this->matchValue("false")) {
     auto *token = this->tokens_[this->index_ - 1].get();
-    return std::make_unique<ml::ast::LiteralExpression>(token->start,
-                                                        token->end, "false");
+    return std::make_unique<ml::ast::LiteralExpression>(
+        token->start, token->end, "false", ast::LiteralType::Boolean);
   }
   if (this->matchValue("this")) {
     auto *token = this->tokens_[this->index_ - 1].get();
     return std::make_unique<ml::ast::IdentifierExpression>(
         token->start, token->end, token->value);
   }
-  if (this->matchToken(ml::lexer::TokenKind::Integer) ||
-      this->matchToken(ml::lexer::TokenKind::Float)) {
+  if (this->matchToken(ml::lexer::TokenKind::Integer)) {
     auto *token = this->tokens_[this->index_ - 1].get();
     return std::make_unique<ml::ast::LiteralExpression>(
-        token->start, token->end, token->value);
+        token->start, token->end, token->value, ast::LiteralType::Integer);
+  }
+  if (this->matchToken(ml::lexer::TokenKind::Float)) {
+    auto *token = this->tokens_[this->index_ - 1].get();
+    return std::make_unique<ml::ast::LiteralExpression>(
+        token->start, token->end, token->value, ast::LiteralType::Float);
   }
   if (this->matchToken(ml::lexer::TokenKind::String)) {
     auto *token = this->tokens_[this->index_ - 1].get();
     return std::make_unique<ml::ast::LiteralExpression>(
-        token->start, token->end, token->value);
+        token->start, token->end, token->value, ast::LiteralType::String);
   }
   if (this->matchToken(ml::lexer::TokenKind::Character)) {
     auto *token = this->tokens_[this->index_ - 1].get();
     return std::make_unique<ml::ast::LiteralExpression>(
-        token->start, token->end, token->value);
+        token->start, token->end, token->value, ast::LiteralType::Character);
   }
   if (this->matchToken(ml::lexer::TokenKind::Identifier)) {
     auto *token = this->tokens_[this->index_ - 1].get();

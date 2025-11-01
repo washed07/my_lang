@@ -25,7 +25,6 @@ enum class Modifier : uint8_t {
   Init = 1 << 4,
   Nullable = 1 << 5,
 };
-ENABLE_BITMASKS(Modifier)
 
 /**
  * @brief Checks if the given string is a valid modifier.
@@ -54,3 +53,5 @@ inline Modifier getmod(const std::string str) {
 }
 
 } // namespace ml::basic
+
+ENABLE_BITMASKS(ml::basic::Modifier)

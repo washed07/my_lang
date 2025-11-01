@@ -1,3 +1,3 @@
-fn pro main() {
+pub fn main() {
   outputln("Hello, My Language!");
 }

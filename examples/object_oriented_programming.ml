@@ -1,6 +1,6 @@
 rec Person {
-    let pub name: str = "hi";
-    let age: i32;
+    pub name: str = "hi";
+    age: i32;
 }
 
 cls Calculator {
